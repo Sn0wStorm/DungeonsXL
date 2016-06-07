@@ -70,6 +70,7 @@ public class P extends JavaPlugin {
 	}
 
 	public void clearData() {
+		Reward.clear();
 		HandlerList.unregisterAll(p);
 		getServer().getScheduler().cancelTasks(P.p);
 		xServer.getManager().getEventHandler().unregisterListener(xListener);

@@ -1,6 +1,7 @@
 package java.com.snow.dungeonreward;
 
 import java.util.ListIterator;
+import java.util.UUID;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -17,21 +18,21 @@ public class PlayerListener implements Listener {
 	@EventHandler(ignoreCancelled = true)
 	public void onPlayerJoin(PlayerJoinEvent event) {
 		final Player player = event.getPlayer();
-		P.p.getServer().getScheduler().scheduleSyncDelayedTask(P.p, new AskRunnable(player.getName()), 10);
+		P.p.getServer().getScheduler().scheduleSyncDelayedTask(P.p, new AskRunnable(player.getUniqueId()), 10);
 	}
 
 	public class AskRunnable implements Runnable {
-		private final String name;
+		private final UUID id;
 
-		public AskRunnable(String name) {
-			this.name = name;
+		public AskRunnable(UUID id) {
+			this.id = id;
 		}
 
 		@Override
 		public void run() {
-			Reward reward = Reward.get(name);
+			Reward reward = Reward.get(id);
 			if (reward != null) {
-				Player p = P.p.getServer().getPlayerExact(name);
+				Player p = P.p.getServer().getPlayer(id);
 				if (p != null) {
 					if (reward.isDone()) {
 						reward.show(p);
@@ -40,12 +41,12 @@ public class PlayerListener implements Listener {
 							if (reward.isTut()) {
 								// Do some after tutorial stuff
 							}
-							reward.askForInv(name);
+							reward.askForInv(id);
 						}
 						if (reward.dec()) {
-							P.p.getServer().getScheduler().scheduleSyncDelayedTask(P.p, new AskRunnable(name), 40);
+							P.p.getServer().getScheduler().scheduleSyncDelayedTask(P.p, new AskRunnable(id), 40);
 						} else {
-							Reward.remove(name);
+							Reward.remove(id);
 							P.p.errorLog("Could not receive Inventory");
 						}
 					}
@@ -68,7 +69,7 @@ public class PlayerListener implements Listener {
 						}
 					}, 2);
 				} else {
-					Reward.remove(player.getName());
+					Reward.remove(player.getUniqueId());
 					ListIterator<ItemStack> iter = event.getInventory().iterator();
 					Location loc = player.getLocation();
 					World world = loc.getWorld();

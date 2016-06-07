@@ -21,11 +21,13 @@ import io.github.dre2n.dungeonsxl.DungeonsXL;
 import io.github.dre2n.dungeonsxl.xserver.XMan;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 /**
  * @author Frank Baumann, Daniel Saukel
@@ -37,13 +39,13 @@ public class DLootInventory {
 
     //private Inventory inventory;
     //private InventoryView inventoryView;
-    private final String player;
+    private final UUID playerId;
     public ItemStack[] items;
 
     //private long time;
 
-    public DLootInventory(String player, ItemStack[] itemStacks, final boolean tut) {
-        this.player = player;
+    public DLootInventory(Player player, ItemStack[] itemStacks, final boolean tut) {
+        this.playerId = player.getUniqueId();
         if (XMan.x == null) {
             return;
         }
@@ -88,7 +90,8 @@ public class DLootInventory {
         byte[] data = null;
 
         try {
-            out.writeUTF(player);
+            out.writeLong(playerId.getMostSignificantBits());
+            out.writeLong(playerId.getLeastSignificantBits());
             out.writeBoolean(tut);
             data = b.toByteArray();
             out.close();
@@ -111,7 +114,8 @@ public class DLootInventory {
         byte[] data = null;
 
         try {
-            out.writeUTF(player);
+            out.writeLong(playerId.getMostSignificantBits());
+            out.writeLong(playerId.getLeastSignificantBits());
             out.writeShort(items.length);
 
             for (int i = 0; i < items.length; i++) {
@@ -222,12 +226,12 @@ public class DLootInventory {
 
     // Static
     /**
-     * @param player
-     * the player whose DLootIntentory will be returned
+     * @param id
+     * the playerUUID whose DLootIntentory will be returned
      */
-    public static DLootInventory getByName(String player) {
+    public static DLootInventory getById(UUID id) {
         for (DLootInventory inventory : plugin.getDLootInventories()) {
-            if (inventory.player.equals(player)) {
+            if (inventory.playerId.equals(id)) {
                 return inventory;
             }
         }

@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.bukkit.Material;
 import org.bukkit.configuration.InvalidConfigurationException;
@@ -19,7 +20,7 @@ import org.bukkit.inventory.ItemStack;
 import de.mickare.xserver.Message;
 
 public class Reward implements InventoryHolder {
-	private static Map <String, Reward> rewards = new HashMap<String, Reward>();
+	private static Map <UUID, Reward> rewards = new HashMap<UUID, Reward>();
 
 	private Inventory inv = null;
 	private short tries = 3;
@@ -94,13 +95,14 @@ public class Reward implements InventoryHolder {
 		return inv != null;
 	}
 
-	public synchronized void askForInv(String player) {
+	public synchronized void askForInv(UUID player) {
 		ByteArrayOutputStream b = new ByteArrayOutputStream();
 		DataOutputStream out = new DataOutputStream(b);
 		byte[] data = null;
 
 		try {
-			out.writeUTF(player);
+			out.writeLong(player.getMostSignificantBits());
+			out.writeLong(player.getLeastSignificantBits());
 			data = b.toByteArray();
 			out.close();
 		} catch (IOException e) {
@@ -116,13 +118,14 @@ public class Reward implements InventoryHolder {
 		P.p.sendDxlMessage(msg);
 	}
 
-	public void sendGotInv(String player) {
+	public void sendGotInv(UUID player) {
 		ByteArrayOutputStream b = new ByteArrayOutputStream();
 		DataOutputStream out = new DataOutputStream(b);
 		byte[] data = null;
 
 		try {
-			out.writeUTF(player);
+			out.writeLong(player.getMostSignificantBits());
+			out.writeLong(player.getLeastSignificantBits());
 			data = b.toByteArray();
 			out.close();
 		} catch (IOException e) {
@@ -150,7 +153,7 @@ public class Reward implements InventoryHolder {
 			player.sendMessage("§a#        Besuche auch den /spawn       #");
 			player.sendMessage("§a#####            Viel Spaß!            #####");
 			player.sendMessage(" ");
-			rewards.remove(player.getName());
+			rewards.remove(player.getUniqueId());
 		} else {
 			time = System.currentTimeMillis();
 			player.openInventory(inv);
@@ -170,15 +173,19 @@ public class Reward implements InventoryHolder {
 		return tut;
 	}
 
-	public synchronized static Reward get(String player) {
+	public synchronized static Reward get(UUID player) {
 		return rewards.get(player);
 	}
 
-	public synchronized static void remove(String player) {
+	public synchronized static void remove(UUID player) {
 		rewards.remove(player);
 	}
 
-	public synchronized static void markReward(String player, boolean tut) {
+	public static void clear() {
+		rewards.clear();
+	}
+
+	public synchronized static void markReward(UUID player, boolean tut) {
 		if (rewards.containsKey(player)) {
 			return;
 		}

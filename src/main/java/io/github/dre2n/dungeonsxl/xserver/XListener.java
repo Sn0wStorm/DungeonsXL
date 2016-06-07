@@ -11,6 +11,7 @@ import io.github.dre2n.dungeonsxl.reward.DLootInventory;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 public class XListener implements XServerListener {
 
@@ -29,8 +30,7 @@ public class XListener implements XServerListener {
 
 		try {
 			if (channel.equals("DXL_GetInv")) {
-				String name = in.readUTF();
-				final DLootInventory loot = DLootInventory.getByName(name);
+				final DLootInventory loot = DLootInventory.getById(new UUID(in.readLong(), in.readLong()));
 				if (loot != null) {
 					plugin.getServer().getScheduler().runTaskAsynchronously(plugin, new Runnable() {
 						@Override
@@ -40,8 +40,7 @@ public class XListener implements XServerListener {
 					});
 				}
 			} else if (channel.equals("DXL_GotInv")) {
-				String name = in.readUTF();
-				final DLootInventory loot = DLootInventory.getByName(name);
+				final DLootInventory loot = DLootInventory.getById(new UUID(in.readLong(), in.readLong()));
 				if (loot != null) {
 					plugin.getDLootInventories().remove(loot);
 				}

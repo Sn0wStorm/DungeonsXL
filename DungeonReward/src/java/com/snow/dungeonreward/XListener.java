@@ -3,6 +3,7 @@ package java.com.snow.dungeonreward;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 import de.mickare.xserver.Message;
 import de.mickare.xserver.XServerListener;
@@ -22,12 +23,10 @@ public class XListener implements XServerListener {
 
 		try {
 			if (channel.equals("DXL_HasReward")) {
-				String player = in.readUTF();
-				Reward.markReward(player, in.readBoolean());
+				Reward.markReward(new UUID(in.readLong(), in.readLong()), in.readBoolean());
 			} else if (channel.equals("DXL_Inv")) {
-				String player = in.readUTF();
-
-				Reward reward = Reward.get(player);
+				UUID id = new UUID(in.readLong(), in.readLong());
+				Reward reward = Reward.get(id);
 				if (reward == null) {
 					P.p.errorLog("Got Inv for non existent Player!");
 					return;
@@ -38,7 +37,7 @@ public class XListener implements XServerListener {
 				}
 
 				reward.readInv(in);
-				reward.sendGotInv(player);
+				reward.sendGotInv(id);
 			} else {
 				P.p.errorLog("Ignoring unknown Message " + msg.getSubChannel());
 			}
