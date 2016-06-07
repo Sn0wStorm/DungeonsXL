@@ -42,6 +42,8 @@ import io.github.dre2n.dungeonsxl.world.GameWorld;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.apache.commons.lang3.ArrayUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -521,7 +523,7 @@ public class DGamePlayer extends DGlobalPlayer {
                         }
 
                         if (gameWorld.isTutorial()) {
-                            new DLootInventory(player.getName(), ArrayUtils.addAll(inv, armor), true);
+                            new DLootInventory(player, ArrayUtils.addAll(inv, armor), true);
                         } else {
                             addTreasure();
                         }
@@ -857,7 +859,7 @@ public class DGamePlayer extends DGlobalPlayer {
     }
 
     public void addTreasure() {
-        new DLootInventory(getPlayer().getName(), treasureInv.getContents(), false);
+        new DLootInventory(getPlayer(), treasureInv.getContents(), false);
     }
 
     public void update(boolean updateSecond) {
