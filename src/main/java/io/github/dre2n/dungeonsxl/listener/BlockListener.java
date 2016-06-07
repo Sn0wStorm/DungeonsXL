@@ -158,6 +158,9 @@ public class BlockListener implements Listener {
         Block block = event.getBlock();
         String[] lines = event.getLines();
         EditWorld editWorld = EditWorld.getByWorld(player.getWorld());
+        for (int i = 0; i < lines.length; i++) {
+            lines[i] = lines[i].replaceAll("\\uF701", "").replaceAll("\\uF700", "");
+        }
 
         // Group Signs
         if (editWorld == null) {
