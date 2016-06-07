@@ -1,4 +1,4 @@
-package java.com.snow.dungeonreward;
+package com.snow.dungeonreward;
 
 import java.util.ListIterator;
 import java.util.UUID;

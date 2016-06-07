@@ -1,4 +1,4 @@
-package java.com.snow.dungeonreward;
+package com.snow.dungeonreward;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
