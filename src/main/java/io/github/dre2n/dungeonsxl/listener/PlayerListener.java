@@ -68,6 +68,7 @@ import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
 
@@ -141,15 +142,11 @@ public class PlayerListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onInteract(PlayerInteractEvent event) {
+    @EventHandler(priority = EventPriority.LOW)
+    public void onPlayerInteractBlock(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         DGlobalPlayer dGlobalPlayer = dPlayers.getByPlayer(player);
         Block clickedBlock = event.getClickedBlock();
-
-        if (dGlobalPlayer.isInBreakMode()) {
-            return;
-        }
 
         if (clickedBlock != null) {
             // Block Enderchests
@@ -181,6 +178,17 @@ public class PlayerListener implements Listener {
                     }
                 }
             }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        DGlobalPlayer dGlobalPlayer = dPlayers.getByPlayer(player);
+        Block clickedBlock = event.getClickedBlock();
+
+        if (dGlobalPlayer.isInBreakMode()) {
+            return;
         }
 
         // Check Portals
@@ -308,6 +316,14 @@ public class PlayerListener implements Listener {
                     }
                 }
             }
+        }
+    }
+
+    // Emptying buckets
+    @EventHandler(ignoreCancelled = true)
+    public void onBucketEmpty(PlayerBucketEmptyEvent event) {
+        if (GameWorld.getByWorld(event.getPlayer().getWorld()) != null) {
+            event.setCancelled(true);
         }
     }
 
@@ -452,6 +468,10 @@ public class PlayerListener implements Listener {
 
         if (dPlayer == null) {
             dPlayers.removePlayer(dPlayer);
+            DGroup dgroup = DGroup.getByPlayer(player);
+            if (dgroup != null) {
+                dgroup.removePlayer(player);
+            }
             return;
         }
 
@@ -560,7 +580,7 @@ public class PlayerListener implements Listener {
     }
 
     // Deny Player Cmds
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent event) {
         if (DPermissions.hasPermission(event.getPlayer(), DPermissions.BYPASS)) {
             return;
