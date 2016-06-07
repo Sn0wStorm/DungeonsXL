@@ -87,7 +87,7 @@ public class DLootInventory {
     private void markReward(boolean tut) {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(b);
-        byte[] data = null;
+        byte[] data;
 
         try {
             out.writeLong(playerId.getMostSignificantBits());
@@ -111,7 +111,7 @@ public class DLootInventory {
     public void sendInventory() {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(b);
-        byte[] data = null;
+        byte[] data;
 
         try {
             out.writeLong(playerId.getMostSignificantBits());

@@ -38,9 +38,9 @@ public class PlayerListener implements Listener {
 						reward.show(p);
 					} else {
 						if (!reward.hasInv()) {
-							if (reward.isTut()) {
+							/*if (reward.isTut()) {
 								// Do some after tutorial stuff
-							}
+							}*/
 							reward.askForInv(id);
 						}
 						if (reward.dec()) {

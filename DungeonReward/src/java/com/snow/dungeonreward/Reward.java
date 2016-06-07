@@ -98,7 +98,7 @@ public class Reward implements InventoryHolder {
 	public synchronized void askForInv(UUID player) {
 		ByteArrayOutputStream b = new ByteArrayOutputStream();
 		DataOutputStream out = new DataOutputStream(b);
-		byte[] data = null;
+		byte[] data;
 
 		try {
 			out.writeLong(player.getMostSignificantBits());
@@ -121,7 +121,7 @@ public class Reward implements InventoryHolder {
 	public void sendGotInv(UUID player) {
 		ByteArrayOutputStream b = new ByteArrayOutputStream();
 		DataOutputStream out = new DataOutputStream(b);
-		byte[] data = null;
+		byte[] data;
 
 		try {
 			out.writeLong(player.getMostSignificantBits());
