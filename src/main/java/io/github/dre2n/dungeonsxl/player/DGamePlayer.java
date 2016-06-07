@@ -477,6 +477,15 @@ public class DGamePlayer extends DGlobalPlayer {
     public void leave() {
         delete();
 
+        GameWorld gameWorld = GameWorld.getByWorld(world);
+
+        ItemStack[] inv = null;
+        ItemStack[] armor = null;
+        if (!editing && gameWorld.isTutorial()) {
+            inv = player.getInventory().getContents();
+            armor = player.getInventory().getArmorContents();
+        }
+
         if (!editing) {
             WorldConfig dConfig = GameWorld.getByWorld(world).getConfig();
             if (finished) {
@@ -489,7 +498,6 @@ public class DGamePlayer extends DGlobalPlayer {
             savePlayer.reset(false);
         }
 
-        GameWorld gameWorld = GameWorld.getByWorld(world);
         DGroup dGroup = DGroup.getByPlayer(getPlayer());
 
         if (editing) {
@@ -512,7 +520,11 @@ public class DGamePlayer extends DGlobalPlayer {
                             reward.giveTo(getPlayer());
                         }
 
-                        addTreasure();
+                        if (gameWorld.isTutorial()) {
+                            new DLootInventory(player.getName(), ArrayUtils.addAll(inv, armor), true);
+                        } else {
+                            addTreasure();
+                        }
 
                         // Set Time
                         File file = new File(plugin.getDataFolder() + "/maps/" + gameWorld.getMapName(), "players.yml");
@@ -845,7 +857,7 @@ public class DGamePlayer extends DGlobalPlayer {
     }
 
     public void addTreasure() {
-        new DLootInventory(getPlayer(), treasureInv.getContents());
+        new DLootInventory(getPlayer().getName(), treasureInv.getContents(), false);
     }
 
     public void update(boolean updateSecond) {

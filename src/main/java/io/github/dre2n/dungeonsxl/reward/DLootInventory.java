@@ -16,108 +16,218 @@
  */
 package io.github.dre2n.dungeonsxl.reward;
 
+import de.mickare.xserver.Message;
 import io.github.dre2n.dungeonsxl.DungeonsXL;
-import io.github.dre2n.dungeonsxl.config.DMessages;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryView;
+import io.github.dre2n.dungeonsxl.xserver.XMan;
+import org.bukkit.Material;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
+
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 /**
  * @author Frank Baumann, Daniel Saukel
  */
 public class DLootInventory {
 
+    public static final Material[] blackListItems = new Material[] { Material.WEB };
     static DungeonsXL plugin = DungeonsXL.getInstance();
 
-    private Inventory inventory;
-    private InventoryView inventoryView;
-    private Player player;
+    //private Inventory inventory;
+    //private InventoryView inventoryView;
+    private final String player;
+    public ItemStack[] items;
 
-    private long time;
+    //private long time;
 
-    public DLootInventory(Player player, ItemStack[] itemStacks) {
+    public DLootInventory(String player, ItemStack[] itemStacks, final boolean tut) {
+        this.player = player;
+        if (XMan.x == null) {
+            return;
+        }
         plugin.getDLootInventories().add(this);
 
-        inventory = Bukkit.createInventory(player, 54, ChatColor.translateAlternateColorCodes('&', plugin.getMessageConfig().getMessage(DMessages.PLAYER_TREASURES)));
+        items = itemStacks;
+        if (tut) {
+            for (int i = 0; i < items.length; i++) {
+                if (items[i] != null) {
+                    for (Material mat : blackListItems) {
+                        if (items[i].getType().equals(mat)) {
+                            items[i] = null;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        //MessageUtil.log(plugin, "sending has reward");
+
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, new Runnable() {
+            @Override
+            public void run() {
+                //MessageUtil.log(plugin, "Yep doing it now!");
+                markReward(tut);
+                //MessageUtil.log(plugin, "done!");
+            }
+        });
+
+        /*inventory = Bukkit.createInventory(player, 54, ChatColor.translateAlternateColorCodes('&', plugin.getMessageConfig().getMessage(DMessages.PLAYER_TREASURES)));
         for (ItemStack itemStack : itemStacks) {
             if (itemStack != null) {
                 inventory.addItem(itemStack);
             }
         }
-        this.player = player;
+        this.player = player;*/
+    }
+
+    private void markReward(boolean tut) {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(b);
+        byte[] data = null;
+
+        try {
+            out.writeUTF(player);
+            out.writeBoolean(tut);
+            data = b.toByteArray();
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        if (data == null) {
+            return;
+        }
+
+        Message msg = XMan.x.getManager().createMessage("DXL_HasReward", data);
+        XMan.sendData(msg);
+    }
+
+    public void sendInventory() {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(b);
+        byte[] data = null;
+
+        try {
+            out.writeUTF(player);
+            out.writeShort(items.length);
+
+            for (int i = 0; i < items.length; i++) {
+                out.writeShort(i);
+
+                if (items[i] == null || items[i].getType().equals(Material.AIR)) {
+                    out.writeBoolean(false);
+                    continue;
+                }
+
+                out.writeBoolean(true);
+                YamlConfiguration serializedItem = new YamlConfiguration();
+                serializedItem.options().indent(2);
+                serializedItem.set("i", items[i]);
+
+                out.writeUTF(serializedItem.saveToString());
+
+				/*Map<String, Object> serializedItem = items[i].serialize();
+				if (serializedItem == null || serializedItem.isEmpty()) {
+					out.writeShort(0);
+					continue;
+				}
+
+				out.writeShort(serializedItem.size());
+				for (Map.Entry<String, Object> entry : serializedItem.entrySet()) {
+					out.writeUTF(entry.getKey());
+					out.writeObject(entry.getValue());
+				}*/
+
+            }
+
+
+            data = b.toByteArray();
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        if (data == null) {
+            return;
+        }
+
+        Message msg = XMan.x.getManager().createMessage("DXL_Inv", data);
+        XMan.sendData(msg);
     }
 
     /**
      * @return the inventory
      */
-    public Inventory getInventory() {
+    /*public Inventory getInventory() {
         return inventory;
-    }
+    }*/
 
     /**
      * @param inventory
      * the inventory to set
      */
-    public void setInventory(Inventory inventory) {
+    /*public void setInventory(Inventory inventory) {
         this.inventory = inventory;
-    }
+    }*/
 
     /**
      * @return the inventoryView
      */
-    public InventoryView getInventoryView() {
+    /*public InventoryView getInventoryView() {
         return inventoryView;
-    }
+    }*/
 
     /**
      * @param inventoryView
      * the inventoryView to set
      */
-    public void setInventoryView(InventoryView inventoryView) {
+    /*public void setInventoryView(InventoryView inventoryView) {
         this.inventoryView = inventoryView;
-    }
+    }*/
 
     /**
      * @return the player
      */
-    public Player getPlayer() {
+    /*public Player getPlayer() {
         return player;
-    }
+    }*/
 
     /**
      * @param player
      * the player to set
      */
+/*
     public void setPlayer(Player player) {
         this.player = player;
-    }
+    }*/
 
     /**
      * @return the time
      */
-    public long getTime() {
+   /*public long getTime() {
         return time;
-    }
+    }*/
 
     /**
      * @param time
      * the time to set
      */
-    public void setTime(long time) {
+    /*public void setTime(long time) {
         this.time = time;
-    }
+    }*/
 
     // Static
     /**
      * @param player
      * the player whose DLootIntentory will be returned
      */
-    public static DLootInventory getByPlayer(Player player) {
+    public static DLootInventory getByName(String player) {
         for (DLootInventory inventory : plugin.getDLootInventories()) {
-            if (inventory.player == player) {
+            if (inventory.player.equals(player)) {
                 return inventory;
             }
         }

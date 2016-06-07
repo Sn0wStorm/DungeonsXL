@@ -22,6 +22,7 @@ import io.github.dre2n.commons.config.MessageConfig;
 import io.github.dre2n.commons.javaplugin.BRPlugin;
 import io.github.dre2n.commons.javaplugin.BRPluginSettings;
 import io.github.dre2n.commons.util.FileUtil;
+import io.github.dre2n.commons.util.messageutil.MessageUtil;
 import io.github.dre2n.dungeonsxl.command.*;
 import io.github.dre2n.dungeonsxl.config.DMessages;
 import io.github.dre2n.dungeonsxl.config.DataConfig;
@@ -142,6 +143,11 @@ public class DungeonsXL extends BRPlugin {
         manager.registerEvents(new HangingListener(), this);
         if (manager.getPlugin("Citizens") != null) {
             manager.registerEvents(new CitizensListener(), this);
+        }
+        if (!getServer().getPluginManager().isPluginEnabled("XServer")) {
+            MessageUtil.log(this, "XServer not installed! Rewardchest will NOT work!");
+        } else {
+            io.github.dre2n.dungeonsxl.xserver.XMan.init();
         }
 
         // Load All

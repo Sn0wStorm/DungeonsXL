@@ -1,0 +1,9 @@
+name: DungeonReward
+version: 0.5
+main: com.snow.dungeonreward.P
+authors: [Sn0wStorm]
+softdepend: [XServer]
+commands:
+  DungeonReward:
+    description: Command for Administration
+    aliases: []

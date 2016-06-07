@@ -534,6 +534,10 @@ public class GameSign extends GlobalProtection {
             gameSign.update();
         }
 
+        if (!plugin.getServer().getPluginManager().isPluginEnabled("XServer")) {
+            MessageUtil.sendMessage(player, "&4&lPlugin Fehler: Belohnungskisten werden nicht funktionieren!&4 Dungeon kann trotzdem gespielt werden");
+        }
+
         return true;
     }
 

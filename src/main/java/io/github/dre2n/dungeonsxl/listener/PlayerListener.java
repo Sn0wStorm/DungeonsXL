@@ -34,7 +34,6 @@ import io.github.dre2n.dungeonsxl.player.DGroup;
 import io.github.dre2n.dungeonsxl.player.DPermissions;
 import io.github.dre2n.dungeonsxl.player.DPlayers;
 import io.github.dre2n.dungeonsxl.player.DSavePlayer;
-import io.github.dre2n.dungeonsxl.reward.DLootInventory;
 import io.github.dre2n.dungeonsxl.reward.RewardChest;
 import io.github.dre2n.dungeonsxl.task.RespawnTask;
 import io.github.dre2n.dungeonsxl.trigger.InteractTrigger;
@@ -55,7 +54,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
@@ -624,7 +622,7 @@ public class PlayerListener implements Listener {
         }
     }
 
-    @EventHandler
+    /*@EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         Player player = (Player) event.getPlayer();
 
@@ -645,13 +643,13 @@ public class PlayerListener implements Listener {
 
             plugin.getDLootInventories().remove(inventory);
         }
-    }
+    }*/
 
     // Player move
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
-        DLootInventory inventory = DLootInventory.getByPlayer(player);
+        //DLootInventory inventory = DLootInventory.getByPlayer(player);
 
         DPortal dPortal = DPortal.getByLocation(player.getEyeLocation());
         //TODO: Fix chat spam
@@ -660,7 +658,7 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        if (inventory == null) {
+        /*if (inventory == null) {
             return;
         }
 
@@ -669,7 +667,7 @@ public class PlayerListener implements Listener {
                 && player.getLocation().getBlock().getRelative(0, 0, 1).getType() != Material.PORTAL && player.getLocation().getBlock().getRelative(0, 0, -1).getType() != Material.PORTAL) {
             inventory.setInventoryView(player.openInventory(inventory.getInventory()));
             inventory.setTime(System.currentTimeMillis());
-        }
+        }*/
     }
 
 }
