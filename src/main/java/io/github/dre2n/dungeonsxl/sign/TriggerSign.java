@@ -38,8 +38,8 @@ public class TriggerSign extends DSign {
     private int triggerId;
     private boolean initialized;
 
-    public TriggerSign(Sign sign, GameWorld gameWorld) {
-        super(sign, gameWorld);
+    public TriggerSign(Sign sign, String[] lines, GameWorld gameWorld) {
+        super(sign, lines, gameWorld);
     }
 
     @Override
@@ -100,7 +100,7 @@ public class TriggerSign extends DSign {
             return;
         }
 
-        SignTrigger trigger = SignTrigger.get(triggerId, getGameWorld());
+        SignTrigger trigger = SignTrigger.getById(triggerId, getGameWorld());
         if (trigger != null) {
             trigger.onTrigger(true);
         }
@@ -112,7 +112,7 @@ public class TriggerSign extends DSign {
             return;
         }
 
-        SignTrigger trigger = SignTrigger.get(triggerId, getGameWorld());
+        SignTrigger trigger = SignTrigger.getById(triggerId, getGameWorld());
         if (trigger != null) {
             trigger.onTrigger(false);
         }

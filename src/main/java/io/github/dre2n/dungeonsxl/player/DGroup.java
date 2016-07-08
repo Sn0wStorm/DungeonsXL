@@ -19,7 +19,6 @@ package io.github.dre2n.dungeonsxl.player;
 import io.github.dre2n.commons.util.messageutil.MessageUtil;
 import io.github.dre2n.dungeonsxl.DungeonsXL;
 import io.github.dre2n.dungeonsxl.config.DMessages;
-import io.github.dre2n.dungeonsxl.config.WorldConfig;
 import io.github.dre2n.dungeonsxl.dungeon.Dungeon;
 import io.github.dre2n.dungeonsxl.event.dgroup.DGroupDisbandEvent;
 import io.github.dre2n.dungeonsxl.event.dgroup.DGroupStartFloorEvent;
@@ -27,6 +26,7 @@ import io.github.dre2n.dungeonsxl.event.dplayer.DPlayerJoinDGroupEvent;
 import io.github.dre2n.dungeonsxl.event.requirement.RequirementDemandEvent;
 import io.github.dre2n.dungeonsxl.event.reward.RewardAdditionEvent;
 import io.github.dre2n.dungeonsxl.game.Game;
+import io.github.dre2n.dungeonsxl.game.GameRules;
 import io.github.dre2n.dungeonsxl.game.GameType;
 import io.github.dre2n.dungeonsxl.game.GameTypeDefault;
 import io.github.dre2n.dungeonsxl.global.GroupSign;
@@ -34,12 +34,13 @@ import io.github.dre2n.dungeonsxl.requirement.Requirement;
 import io.github.dre2n.dungeonsxl.reward.Reward;
 import io.github.dre2n.dungeonsxl.task.TimeIsRunningTask;
 import io.github.dre2n.dungeonsxl.world.GameWorld;
+import io.github.dre2n.dungeonsxl.world.Worlds;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -49,11 +50,13 @@ import org.bukkit.scheduler.BukkitTask;
 public class DGroup {
 
     static DungeonsXL plugin = DungeonsXL.getInstance();
+    static DPlayers dPlayers = plugin.getDPlayers();
 
     private String name;
-    private Player captain;
-    private CopyOnWriteArrayList<Player> players = new CopyOnWriteArrayList<>();
+    private UUID captain;
+    private List<UUID> players = new ArrayList<>();
     private List<UUID> invitedPlayers = new ArrayList<>();
+    private Dungeon dungeon;
     private String dungeonName;
     private String mapName;
     private List<String> unplayedFloors = new ArrayList<>();
@@ -62,13 +65,18 @@ public class DGroup {
     private int floorCount;
     private List<Reward> rewards = new ArrayList<>();
     private BukkitTask timeIsRunningTask;
+    private String nextFloor;
+
+    public DGroup(Player player) {
+        this("Group_" + plugin.getDGroups().size(), player);
+    }
 
     public DGroup(String name, Player player) {
         plugin.getDGroups().add(this);
         this.name = name;
 
-        captain = player;
-        players.add(player);
+        setCaptain(player);
+        addPlayer(player);
 
         playing = false;
         floorCount = 0;
@@ -90,23 +98,27 @@ public class DGroup {
         plugin.getServer().getPluginManager().callEvent(event);
 
         if (!event.isCancelled()) {
-            this.captain = captain;
-            this.players.add(captain);
+            this.captain = captain.getUniqueId();
+            this.players.add(captain.getUniqueId());
         }
 
         for (Player player : players) {
-            addPlayer(player);
+            if (!this.players.contains(player.getUniqueId())) {
+                addPlayer(player);
+            }
         }
 
-        Dungeon dungeon = plugin.getDungeons().getDungeon(identifier);
+        dungeon = plugin.getDungeons().getByName(identifier);
         if (multiFloor && dungeon != null) {
-            dungeonName = identifier;
+            dungeonName = dungeon.getName();
             mapName = dungeon.getConfig().getStartFloor();
             unplayedFloors = dungeon.getConfig().getFloors();
 
         } else {
             mapName = identifier;
+            dungeon = new Dungeon(identifier);
         }
+
         playing = false;
         floorCount = 0;
     }
@@ -131,7 +143,7 @@ public class DGroup {
      * @return the captain
      */
     public Player getCaptain() {
-        return captain;
+        return Bukkit.getPlayer(captain);
     }
 
     /**
@@ -139,44 +151,99 @@ public class DGroup {
      * the captain to set
      */
     public void setCaptain(Player captain) {
-        this.captain = captain;
+        this.captain = captain.getUniqueId();
     }
 
     /**
-     * @return the players
+     * @return the players as a Set<Player>
      */
     public List<Player> getPlayers() {
+        List<Player> players = new ArrayList<>();
+        for (UUID uuid : this.players) {
+            players.add(Bukkit.getPlayer(uuid));
+        }
         return players;
+    }
+
+    /**
+     * @return the players as a Set<DGlobalPlayer>
+     */
+    public List<DGlobalPlayer> getDGlobalPlayers() {
+        List<DGlobalPlayer> players = new ArrayList<>();
+        for (UUID uuid : this.players) {
+            players.add(dPlayers.getByPlayer(Bukkit.getPlayer(uuid)));
+        }
+        return players;
+    }
+
+    /**
+     * @return the players as a Set<DGamePlayer>
+     */
+    public List<DGamePlayer> getDGamePlayers() {
+        List<DGamePlayer> players = new ArrayList<>();
+        for (UUID uuid : this.players) {
+            DGlobalPlayer dPlayer = dPlayers.getByPlayer(Bukkit.getPlayer(uuid));
+            if (dPlayer instanceof DGamePlayer) {
+                players.add((DGamePlayer) dPlayer);
+            }
+        }
+        return players;
+    }
+
+    /**
+     * Sends messages by default.
+     *
+     * @param player
+     * the player to add
+     */
+    public void addPlayer(Player player) {
+        addPlayer(player, true);
     }
 
     /**
      * @param player
      * the player to add
+     * @param message
+     * if messages should be sent
      */
-    public void addPlayer(Player player) {
+    public void addPlayer(Player player, boolean message) {
         DPlayerJoinDGroupEvent event = new DPlayerJoinDGroupEvent(DGamePlayer.getByPlayer(player), false, this);
         plugin.getServer().getPluginManager().callEvent(event);
 
         if (!event.isCancelled()) {
-            sendMessage(plugin.getMessageConfig().getMessage(DMessages.GROUP_PLAYER_JOINED, player.getName()));
-            MessageUtil.sendMessage(player, plugin.getMessageConfig().getMessage(DMessages.PLAYER_JOIN_GROUP));
+            if (message) {
+                sendMessage(DMessages.GROUP_PLAYER_JOINED.getMessage(player.getName()));
+                MessageUtil.sendMessage(player, DMessages.PLAYER_JOIN_GROUP.getMessage());
+            }
 
-            players.add(player);
+            players.add(player.getUniqueId());
         }
+    }
+
+    /**
+     * Sends messages by default.
+     *
+     * @param player
+     * the player to remove
+     */
+    public void removePlayer(Player player) {
+        removePlayer(player, true);
     }
 
     /**
      * @param player
      * the player to remove
+     * @param message
+     * if messages should be sent
      */
-    public void removePlayer(Player player) {
-        players.remove(player);
+    public void removePlayer(Player player, boolean message) {
+        players.remove(player.getUniqueId());
         GroupSign.updatePerGroup(this);
 
-        // Send message
-        sendMessage(plugin.getMessageConfig().getMessage(DMessages.PLAYER_LEFT_GROUP, player.getName()));
+        if (message) {
+            sendMessage(plugin.getMessageConfig().getMessage(DMessages.PLAYER_LEFT_GROUP, player.getName()));
+        }
 
-        // Check group
         if (isEmpty()) {
             DGroupDisbandEvent event = new DGroupDisbandEvent(this, player, DGroupDisbandEvent.Cause.GROUP_IS_EMPTY);
             plugin.getServer().getPluginManager().callEvent(event);
@@ -210,18 +277,18 @@ public class DGroup {
 
         if (DGroup.getByPlayer(player) != null) {
             if (!silent) {
-                MessageUtil.sendMessage(captain, plugin.getMessageConfig().getMessage(DMessages.ERROR_IN_GROUP, player.getName()));
+                MessageUtil.sendMessage(getCaptain(), plugin.getMessageConfig().getMessage(DMessages.ERROR_IN_GROUP, player.getName()));
             }
             return;
         }
 
         if (!silent) {
-            MessageUtil.sendMessage(player, plugin.getMessageConfig().getMessage(DMessages.PLAYER_INVITED, captain.getName(), name));
+            MessageUtil.sendMessage(player, plugin.getMessageConfig().getMessage(DMessages.PLAYER_INVITED, getCaptain().getName(), name));
         }
 
         // Send message
         if (!silent) {
-            sendMessage(plugin.getMessageConfig().getMessage(DMessages.GROUP_INVITED_PLAYER, captain.getName(), player.getName(), name));
+            sendMessage(plugin.getMessageConfig().getMessage(DMessages.GROUP_INVITED_PLAYER, getCaptain().getName(), player.getName(), name));
         }
 
         // Add player
@@ -239,7 +306,7 @@ public class DGroup {
 
         if (DGroup.getByPlayer(player) != this) {
             if (!silent) {
-                MessageUtil.sendMessage(captain, plugin.getMessageConfig().getMessage(DMessages.ERROR_NOT_IN_GROUP, player.getName(), name));
+                MessageUtil.sendMessage(getCaptain(), plugin.getMessageConfig().getMessage(DMessages.ERROR_NOT_IN_GROUP, player.getName(), name));
             }
             return;
         }
@@ -251,7 +318,7 @@ public class DGroup {
         // Send message
         if (!silent) {
             for (Player groupPlayer : getPlayers()) {
-                MessageUtil.sendMessage(groupPlayer, plugin.getMessageConfig().getMessage(DMessages.GROUP_UNINVITED_PLAYER, captain.getName(), player.getName(), name));
+                MessageUtil.sendMessage(groupPlayer, plugin.getMessageConfig().getMessage(DMessages.GROUP_UNINVITED_PLAYER, getCaptain().getName(), player.getName(), name));
             }
         }
 
@@ -289,6 +356,40 @@ public class DGroup {
     }
 
     /**
+     * @return the dungeon
+     */
+    public Dungeon getDungeon() {
+        return dungeon;
+    }
+
+    /**
+     * @param dungeon
+     * the dungeon to set
+     */
+    public void setDungeon(Dungeon dungeon) {
+        this.dungeon = dungeon;
+    }
+
+    /**
+     * Sets up all dungeon-related fields.
+     *
+     * @param name
+     * the name of the dungeon
+     */
+    public void setDungeon(String name) {
+        dungeon = plugin.getDungeons().getByName(name);
+        if (dungeon != null) {
+            dungeonName = dungeon.getName();
+            mapName = dungeon.getConfig().getStartFloor();
+            unplayedFloors = dungeon.getConfig().getFloors();
+
+        } else {
+            mapName = name;
+            dungeon = new Dungeon(name);
+        }
+    }
+
+    /**
      * @return the dungeonName
      */
     public String getDungeonName() {
@@ -296,26 +397,15 @@ public class DGroup {
     }
 
     /**
+     * Will fail if there is no dungeon with this name.
+     *
      * @param dungeonName
      * the dungeonName to set
      */
     public void setDungeonName(String dungeonName) {
-        this.dungeonName = dungeonName;
-    }
-
-    /**
-     * @return the dungeon (saved by name only)
-     */
-    public Dungeon getDungeon() {
-        return plugin.getDungeons().getDungeon(dungeonName);
-    }
-
-    /**
-     * @param dungeon
-     * the dungeon to set (saved by name only)
-     */
-    public void setDungeon(Dungeon dungeon) {
-        dungeonName = dungeon.getName();
+        if (plugin.getDungeons().getByName(name) != null) {
+            this.dungeonName = dungeonName;
+        }
     }
 
     /**
@@ -326,11 +416,15 @@ public class DGroup {
     }
 
     /**
+     * Will fail if there is no resource world with this name.
+     *
      * @param name
      * the name to set
      */
     public void setMapName(String name) {
-        mapName = name;
+        if (Worlds.exists(name)) {
+            mapName = name;
+        }
     }
 
     /**
@@ -440,6 +534,28 @@ public class DGroup {
         return players.isEmpty();
     }
 
+    /**
+     * @return if the group has been customized with a command
+     */
+    public boolean isCustom() {
+        return !name.matches("Group_[0-9]{1,}");
+    }
+
+    /**
+     * @return the next floor the group will enter
+     */
+    public String getNextFloor() {
+        return nextFloor;
+    }
+
+    /**
+     * @param floor
+     * the next floor to set
+     */
+    public void setNextFloor(String floor) {
+        nextFloor = floor;
+    }
+
     /* Actions */
     /**
      * Remove the group from the List
@@ -464,6 +580,7 @@ public class DGroup {
         if (game == null) {
             return;
         }
+        game.fetchRules();
 
         for (DGroup dGroup : game.getDGroups()) {
             if (dGroup == null) {
@@ -512,7 +629,7 @@ public class DGroup {
 
             dPlayer.respawn();
 
-            if (plugin.getMainConfig().getSendFloorTitle()) {
+            if (plugin.getMainConfig().isSendFloorTitleEnabled()) {
                 if (dungeonName != null) {
                     MessageUtil.sendTitleMessage(player, "&b&l" + dungeonName.replaceAll("_", " "), "&4&l" + mapName.replaceAll("_", " "));
 
@@ -521,43 +638,95 @@ public class DGroup {
                 }
             }
 
-            WorldConfig config = gameWorld.getConfig();
-            if (config != null) {
-                for (Requirement requirement : config.getRequirements()) {
-                    RequirementDemandEvent requirementDemandEvent = new RequirementDemandEvent(requirement, player);
-                    plugin.getServer().getPluginManager().callEvent(event);
+            GameRules rules = game.getRules();
 
-                    if (requirementDemandEvent.isCancelled()) {
-                        continue;
-                    }
+            for (Requirement requirement : rules.getRequirements()) {
+                RequirementDemandEvent requirementDemandEvent = new RequirementDemandEvent(requirement, player);
+                plugin.getServer().getPluginManager().callEvent(event);
 
-                    requirement.demand(player);
+                if (requirementDemandEvent.isCancelled()) {
+                    continue;
                 }
 
-                GameType gameType = game.getType();
-                if (gameType == GameTypeDefault.DEFAULT) {
-                    player.setGameMode(config.getGameMode());
-                    if (config.isTimeIsRunning()) {
-                        timeIsRunningTask = new TimeIsRunningTask(this, config.getTimeToFinish()).runTaskTimer(plugin, 20, 20);
-                    }
+                requirement.demand(player);
+            }
 
-                } else {
-                    player.setGameMode(gameType.getGameMode());
-                    if (gameType.getShowTime()) {
-                        timeIsRunningTask = new TimeIsRunningTask(this, config.getTimeToFinish()).runTaskTimer(plugin, 20, 20);
-                    }
+            GameType gameType = game.getType();
+            if (gameType == GameTypeDefault.DEFAULT) {
+                player.setGameMode(rules.getGameMode());
+                if (rules.isTimeIsRunning()) {
+                    timeIsRunningTask = new TimeIsRunningTask(this, rules.getTimeToFinish()).runTaskTimer(plugin, 20, 20);
+                }
+
+            } else {
+                player.setGameMode(gameType.getGameMode());
+                if (gameType.getShowTime()) {
+                    timeIsRunningTask = new TimeIsRunningTask(this, rules.getTimeToFinish()).runTaskTimer(plugin, 20, 20);
+                }
+            }
+
+            // Permission bridge
+            if (plugin.getPermissionProvider() != null) {
+                for (String permission : rules.getGamePermissions()) {
+                    plugin.getPermissionProvider().playerRemoveTransient(gameWorld.getWorld().getName(), player, permission);
                 }
             }
         }
 
         GroupSign.updatePerGroup(this);
+        nextFloor = null;
+    }
+
+    public boolean checkTime(Game game) {
+        if (DPermissions.hasPermission(getCaptain(), DPermissions.IGNORE_TIME_LIMIT)) {
+            return true;
+        }
+
+        for (DGamePlayer dPlayer : getDGamePlayers()) {
+            if (!dPlayer.checkTime(game)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public boolean checkRequirements(Game game) {
+        if (DPermissions.hasPermission(getCaptain(), DPermissions.IGNORE_REQUIREMENTS)) {
+            return true;
+        }
+
+        for (DGamePlayer dPlayer : getDGamePlayers()) {
+            if (!dPlayer.checkRequirements(game)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public boolean finishIfMembersFinished() {
+        boolean finish = true;
+
+        for (DGamePlayer dPlayer : getDGamePlayers()) {
+            if (!dPlayer.isFinished()) {
+                finish = false;
+                break;
+            }
+        }
+
+        if (finish && getDGamePlayers().size() > 0) {
+            getDGamePlayers().get(0).finishFloor(nextFloor);
+        }
+
+        return finish;
     }
 
     /**
      * Send a message to all players in the group
      */
     public void sendMessage(String message) {
-        for (Player player : players) {
+        for (Player player : getPlayers()) {
             if (player.isOnline()) {
                 MessageUtil.sendMessage(player, message);
             }
@@ -572,7 +741,7 @@ public class DGroup {
      */
     public void sendMessage(String message, Player... except) {
         HashSet<Player> exceptSet = new HashSet<>(Arrays.asList(except));
-        for (Player player : players) {
+        for (Player player : getPlayers()) {
             if (player.isOnline() && !exceptSet.contains(player)) {
                 MessageUtil.sendMessage(player, message);
             }

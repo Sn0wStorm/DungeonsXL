@@ -14,35 +14,35 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package io.github.dre2n.dungeonsxl.config;
+package io.github.dre2n.dungeonsxl.task;
 
-import io.github.dre2n.commons.config.BRConfig;
-import java.io.File;
+import io.github.dre2n.dungeonsxl.DungeonsXL;
+import org.bukkit.Location;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.scheduler.BukkitRunnable;
 
 /**
- * @author Daniel Saukel
+ * @author Frank Baumann, Daniel Saukel
  */
-public class DataConfig extends BRConfig {
+public class DropItemTask extends BukkitRunnable {
 
-    public static final int CONFIG_VERSION = 2;
+    DungeonsXL plugin = DungeonsXL.getInstance();
 
-    public DataConfig(File file) {
-        super(file, CONFIG_VERSION);
+    private ItemStack item;
+    private Location location;
 
-        if (initialize) {
-            initialize();
+    public DropItemTask(ItemStack item, Location location) {
+        this.item = item;
+        this.location = location;
+    }
+
+    @Override
+    public void run() {
+        try {
+            location.getWorld().dropItem(location, item);
+        } catch (NullPointerException exception) {
+            cancel();
         }
-        load();
-    }
-
-    @Override
-    public void initialize() {
-        save();
-    }
-
-    @Override
-    public void load() {
-        // Load?
     }
 
 }

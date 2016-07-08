@@ -19,23 +19,26 @@ package io.github.dre2n.dungeonsxl.listener;
 import io.github.dre2n.commons.util.messageutil.MessageUtil;
 import io.github.dre2n.dungeonsxl.DungeonsXL;
 import io.github.dre2n.dungeonsxl.config.DMessages;
-import io.github.dre2n.dungeonsxl.config.WorldConfig;
+import io.github.dre2n.dungeonsxl.config.MainConfig;
 import io.github.dre2n.dungeonsxl.event.dgroup.DGroupCreateEvent;
 import io.github.dre2n.dungeonsxl.event.dplayer.DPlayerDeathEvent;
-import io.github.dre2n.dungeonsxl.event.dplayer.DPlayerKickEvent;
+import io.github.dre2n.dungeonsxl.game.Game;
 import io.github.dre2n.dungeonsxl.global.DPortal;
 import io.github.dre2n.dungeonsxl.global.GameSign;
 import io.github.dre2n.dungeonsxl.global.GlobalProtection;
 import io.github.dre2n.dungeonsxl.global.GroupSign;
 import io.github.dre2n.dungeonsxl.global.LeaveSign;
+import io.github.dre2n.dungeonsxl.player.DEditPlayer;
 import io.github.dre2n.dungeonsxl.player.DGamePlayer;
 import io.github.dre2n.dungeonsxl.player.DGlobalPlayer;
 import io.github.dre2n.dungeonsxl.player.DGroup;
+import io.github.dre2n.dungeonsxl.player.DInstancePlayer;
 import io.github.dre2n.dungeonsxl.player.DPermissions;
 import io.github.dre2n.dungeonsxl.player.DPlayers;
 import io.github.dre2n.dungeonsxl.player.DSavePlayer;
 import io.github.dre2n.dungeonsxl.reward.DLootInventory;
 import io.github.dre2n.dungeonsxl.reward.RewardChest;
+import io.github.dre2n.dungeonsxl.sign.OpenDoorSign;
 import io.github.dre2n.dungeonsxl.task.RespawnTask;
 import io.github.dre2n.dungeonsxl.trigger.InteractTrigger;
 import io.github.dre2n.dungeonsxl.trigger.UseItemTrigger;
@@ -63,6 +66,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -83,15 +87,18 @@ public class PlayerListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
-        DGamePlayer dPlayer = DGamePlayer.getByPlayer(player);
 
         GameWorld gameWorld = GameWorld.getByWorld(player.getLocation().getWorld());
         if (gameWorld == null) {
             return;
         }
 
-        WorldConfig dConfig = gameWorld.getConfig();
+        Game game = Game.getByGameWorld(gameWorld);
+        if (game == null) {
+            return;
+        }
 
+        DGamePlayer dPlayer = DGamePlayer.getByPlayer(player);
         if (dPlayer == null) {
             return;
         }
@@ -116,29 +123,18 @@ public class PlayerListener implements Listener {
         if (dPlayer.getLives() != -1) {
             MessageUtil.sendMessage(player, DMessages.PLAYER_DEATH.getMessage(String.valueOf(dPlayer.getLives())));
 
-            if (dConfig != null) {
-                if (dConfig.getKeepInventoryOnDeath()) {
-                    dPlayer.setRespawnInventory(event.getEntity().getInventory().getContents());
-                    dPlayer.setRespawnArmor(event.getEntity().getInventory().getArmorContents());
-                    // Delete all drops
-                    for (ItemStack item : event.getDrops()) {
-                        item.setType(Material.AIR);
-                    }
+            if (game.getRules().getKeepInventoryOnDeath()) {
+                dPlayer.setRespawnInventory(event.getEntity().getInventory().getContents());
+                dPlayer.setRespawnArmor(event.getEntity().getInventory().getArmorContents());
+                // Delete all drops
+                for (ItemStack item : event.getDrops()) {
+                    item.setType(Material.AIR);
                 }
             }
         }
 
         if (dPlayer.getLives() == 0 && dPlayer.isReady()) {
-            DPlayerKickEvent dPlayerKickEvent = new DPlayerKickEvent(dPlayer, DPlayerKickEvent.Cause.DEATH);
-            plugin.getServer().getPluginManager().callEvent(dPlayerKickEvent);
-
-            if (!dPlayerKickEvent.isCancelled()) {
-                MessageUtil.broadcastMessage(DMessages.PLAYER_DEATH_KICK.getMessage(player.getName()));
-                dPlayer.leave();
-                if (gameWorld.getConfig().getKeepInventoryOnEscape()) {
-                    dPlayer.applyRespawnInventory();
-                }
-            }
+            dPlayer.kill();
         }
     }
 
@@ -224,7 +220,7 @@ public class PlayerListener implements Listener {
             if (EditWorld.getByWorld(player.getWorld()) != null) {
                 if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
                     if (item.getType() == Material.STICK) {
-                        DGamePlayer dPlayer = DGamePlayer.getByPlayer(player);
+                        DEditPlayer dPlayer = DEditPlayer.getByPlayer(player);
                         if (dPlayer != null) {
                             dPlayer.poke(clickedBlock);
                             event.setCancelled(true);
@@ -237,28 +233,26 @@ public class PlayerListener implements Listener {
             GameWorld gameWorld = GameWorld.getByWorld(player.getWorld());
             if (gameWorld != null) {
                 if (event.getAction() == Action.RIGHT_CLICK_BLOCK || event.getAction() == Action.RIGHT_CLICK_AIR) {
-                    if (UseItemTrigger.hasTriggers(gameWorld)) {
-                        String name = null;
-                        if (item.hasItemMeta()) {
-                            if (item.getItemMeta().hasDisplayName()) {
-                                name = item.getItemMeta().getDisplayName();
+                    String name = null;
+                    if (item.hasItemMeta()) {
+                        if (item.getItemMeta().hasDisplayName()) {
+                            name = item.getItemMeta().getDisplayName();
 
-                            } else if (item.getType() == Material.WRITTEN_BOOK || item.getType() == Material.BOOK_AND_QUILL) {
-                                if (item.getItemMeta() instanceof BookMeta) {
-                                    BookMeta meta = (BookMeta) item.getItemMeta();
-                                    if (meta.hasTitle()) {
-                                        name = meta.getTitle();
-                                    }
+                        } else if (item.getType() == Material.WRITTEN_BOOK || item.getType() == Material.BOOK_AND_QUILL) {
+                            if (item.getItemMeta() instanceof BookMeta) {
+                                BookMeta meta = (BookMeta) item.getItemMeta();
+                                if (meta.hasTitle()) {
+                                    name = meta.getTitle();
                                 }
                             }
                         }
-                        if (name == null) {
-                            name = item.getType().toString();
-                        }
-                        UseItemTrigger trigger = UseItemTrigger.get(name, gameWorld);
-                        if (trigger != null) {
-                            trigger.onTrigger(player);
-                        }
+                    }
+                    if (name == null) {
+                        name = item.getType().toString();
+                    }
+                    UseItemTrigger trigger = UseItemTrigger.getByName(name, gameWorld);
+                    if (trigger != null) {
+                        trigger.onTrigger(player);
                     }
                 }
             }
@@ -291,12 +285,10 @@ public class PlayerListener implements Listener {
                     if (gameWorld != null) {
 
                         // Trigger InteractTrigger
-                        InteractTrigger trigger = InteractTrigger.get(clickedBlock, gameWorld);
+                        InteractTrigger trigger = InteractTrigger.getByBlock(clickedBlock, gameWorld);
                         if (trigger != null) {
-                            if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
+                            if (event.getAction() == Action.LEFT_CLICK_BLOCK || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
                                 trigger.onTrigger(player);
-                            } else {
-                                MessageUtil.sendMessage(player, DMessages.ERROR_LEFT_CLICK.getMessage());
                             }
                         }
 
@@ -304,10 +296,8 @@ public class PlayerListener implements Listener {
                         for (Sign classSign : gameWorld.getSignClass()) {
                             if (classSign != null) {
                                 if (classSign.getLocation().distance(clickedBlock.getLocation()) < 1) {
-                                    if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
+                                    if (event.getAction() == Action.LEFT_CLICK_BLOCK || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
                                         dPlayer.setDClass(ChatColor.stripColor(classSign.getLine(1)));
-                                    } else {
-                                        MessageUtil.sendMessage(player, DMessages.ERROR_LEFT_CLICK.getMessage());
                                     }
                                     return;
                                 }
@@ -315,6 +305,9 @@ public class PlayerListener implements Listener {
                         }
                     }
                 }
+
+            } else if (OpenDoorSign.isProtected(clickedBlock)) {
+                event.setCancelled(true);
             }
         }
     }
@@ -331,14 +324,20 @@ public class PlayerListener implements Listener {
     public void onDropItem(PlayerDropItemEvent event) {
         Player player = event.getPlayer();
 
-        DGamePlayer dPlayer = DGamePlayer.getByPlayer(player);
+        DGlobalPlayer dPlayer = dPlayers.getByPlayer(player);
         if (dPlayer == null) {
             return;
         }
 
-        if (dPlayer.isEditing() && !plugin.getMainConfig().getDropItems() && !DPermissions.hasPermission(player, DPermissions.INSECURE)) {
+        if (dPlayer instanceof DEditPlayer && !plugin.getMainConfig().getDropItems() && !DPermissions.hasPermission(player, DPermissions.INSECURE)) {
             event.setCancelled(true);
         }
+
+        if (!(dPlayer instanceof DGamePlayer)) {
+            return;
+        }
+
+        DGamePlayer gamePlayer = (DGamePlayer) dPlayer;
 
         DGroup dGroup = DGroup.getByPlayer(player);
         if (dGroup == null) {
@@ -350,15 +349,15 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        if (!dPlayer.isReady()) {
+        if (!gamePlayer.isReady()) {
             event.setCancelled(true);
             return;
         }
 
-        GameWorld gameWorld = GameWorld.getByWorld(dPlayer.getWorld());
+        Game game = Game.getByWorld(gamePlayer.getWorld());
 
-        for (Material material : gameWorld.getConfig().getSecureObjects()) {
-            if (material == event.getItemDrop().getItemStack().getType()) {
+        for (ItemStack item : game.getRules().getSecureObjects()) {
+            if (event.getItemDrop().getItemStack().isSimilar(item)) {
                 event.setCancelled(true);
                 MessageUtil.sendMessage(player, DMessages.ERROR_DROP.getMessage());
                 return;
@@ -371,13 +370,13 @@ public class PlayerListener implements Listener {
         Player player = event.getPlayer();
         plugin.getDPlayers().getByPlayer(player).applyRespawnInventory();
 
-        DGamePlayer dPlayer = DGamePlayer.getByPlayer(player);
+        DGlobalPlayer dPlayer = DGamePlayer.getByPlayer(player);
         if (dPlayer == null) {
             return;
         }
 
-        if (dPlayer.isEditing()) {
-            EditWorld editWorld = EditWorld.getByWorld(dPlayer.getWorld());
+        if (dPlayer instanceof DEditPlayer) {
+            EditWorld editWorld = EditWorld.getByWorld(((DEditPlayer) dPlayer).getWorld());
             if (editWorld == null) {
                 return;
             }
@@ -389,8 +388,10 @@ public class PlayerListener implements Listener {
                 event.setRespawnLocation(editWorld.getLobbyLocation());
             }
 
-        } else {
-            GameWorld gameWorld = GameWorld.getByWorld(dPlayer.getWorld());
+        } else if (dPlayer instanceof DGamePlayer) {
+            DGamePlayer gamePlayer = (DGamePlayer) dPlayer;
+
+            GameWorld gameWorld = GameWorld.getByWorld(gamePlayer.getWorld());
 
             if (gameWorld == null) {
                 return;
@@ -398,26 +399,18 @@ public class PlayerListener implements Listener {
 
             DGroup dGroup = DGroup.getByPlayer(dPlayer.getPlayer());
 
-            Location respawn = dPlayer.getCheckpoint();
+            Location respawn = gamePlayer.getCheckpoint();
 
             if (respawn == null) {
-                respawn = dGroup.getGameWorld().getStartLocation();
-            }
-
-            if (respawn == null) {
-                respawn = dGroup.getGameWorld().getLobbyLocation();
-            }
-
-            if (respawn == null) {
-                respawn = dGroup.getGameWorld().getWorld().getSpawnLocation();
+                respawn = dGroup.getGameWorld().getStartLocation(dGroup);
             }
 
             // Because some plugins set another respawn point, DXL teleports a few ticks later.
             new RespawnTask(player, respawn).runTaskLater(plugin, 10);
 
             // Don't forget Doge!
-            if (dPlayer.getWolf() != null) {
-                dPlayer.getWolf().teleport(respawn);
+            if (gamePlayer.getWolf() != null) {
+                gamePlayer.getWolf().teleport(respawn);
             }
         }
     }
@@ -464,37 +457,32 @@ public class PlayerListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
-        DGamePlayer dPlayer = DGamePlayer.getByPlayer(player);
-
-        if (dPlayer == null) {
-            dPlayers.removePlayer(dPlayer);
-            DGroup dgroup = DGroup.getByPlayer(player);
-            if (dgroup != null) {
-                dgroup.removePlayer(player);
-            }
-            return;
-        }
-
+        DGlobalPlayer dPlayer = dPlayers.getByPlayer(player);
         DGroup dGroup = DGroup.getByPlayer(player);
+        Game game = Game.getByWorld(player.getWorld());
 
-        // Check GameWorld
-        GameWorld gameWorld = GameWorld.getByWorld(player.getWorld());
-        if (gameWorld != null) {
-            int timeUntilKickOfflinePlayer = gameWorld.getConfig().getTimeUntilKickOfflinePlayer();
+        if (!(dPlayer instanceof DInstancePlayer)) {
+            dPlayers.removePlayer(dPlayer);
+            if (dGroup != null) {
+                dGroup.removePlayer(player);
+            }
+
+        } else if (game != null) {
+            int timeUntilKickOfflinePlayer = game.getRules().getTimeUntilKickOfflinePlayer();
 
             if (timeUntilKickOfflinePlayer == 0) {
-                dPlayer.leave();
+                ((DGamePlayer) dPlayer).leave();
 
             } else if (timeUntilKickOfflinePlayer > 0) {
                 dGroup.sendMessage(DMessages.PLAYER_OFFLINE.getMessage(dPlayer.getPlayer().getName(), String.valueOf(timeUntilKickOfflinePlayer)), player);
-                dPlayer.setOfflineTime(System.currentTimeMillis() + timeUntilKickOfflinePlayer * 1000);
+                ((DGamePlayer) dPlayer).setOfflineTime(System.currentTimeMillis() + timeUntilKickOfflinePlayer * 1000);
 
             } else {
                 dGroup.sendMessage(DMessages.PLAYER_OFFLINE_NEVER.getMessage(dPlayer.getPlayer().getName()), player);
             }
 
-        } else if (dPlayer.isEditing()) {
-            dPlayer.leave();
+        } else if (dPlayer instanceof DEditPlayer) {
+            ((DEditPlayer) dPlayer).leave();
         }
     }
 
@@ -539,7 +527,7 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        if (plugin.getPermissionProvider() == null) {
+        if (plugin.getPermissionProvider() == null || !plugin.getPermissionProvider().hasGroupSupport()) {
             return;
         }
 
@@ -566,7 +554,7 @@ public class PlayerListener implements Listener {
             }
 
             if (dGroup.getGameWorld() == null) {
-                dGroup.setGameWorld(GameWorld.load(DGroup.getByPlayer(player).getMapName()));
+                dGroup.setGameWorld(new GameWorld(DGroup.getByPlayer(player).getMapName()));
                 dGroup.getGameWorld().setTutorial(true);
             }
 
@@ -576,6 +564,42 @@ public class PlayerListener implements Listener {
             }
 
             new DGamePlayer(player, dGroup.getGameWorld());
+            return;
+        }
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    public void onPlayerLogin(PlayerLoginEvent event) {
+        Player player = event.getPlayer();
+        MainConfig config = plugin.getMainConfig();
+
+        if (!config.isTutorialActivated()) {
+            return;
+        }
+
+        if (DGamePlayer.getByPlayer(player) != null) {
+            return;
+        }
+
+        if (plugin.getPermissionProvider() == null || !plugin.getPermissionProvider().hasGroupSupport()) {
+            return;
+        }
+
+        if ((config.getTutorialDungeon() == null || config.getTutorialStartGroup() == null || config.getTutorialEndGroup() == null)) {
+            return;
+        }
+
+        for (String group : plugin.getPermissionProvider().getPlayerGroups(player)) {
+            if (!config.getTutorialStartGroup().equalsIgnoreCase(group)) {
+                continue;
+            }
+
+            if (plugin.getGameWorlds().size() >= config.getMaxInstances()) {
+                event.setResult(PlayerLoginEvent.Result.KICK_FULL);
+                event.setKickMessage(DMessages.ERROR_TOO_MANY_TUTORIALS.getMessage());
+            }
+
+            return;
         }
     }
 
@@ -586,17 +610,17 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        DGamePlayer dPlayer = DGamePlayer.getByPlayer(event.getPlayer());
-        if (dPlayer == null) {
+        if (!(dPlayers.getByPlayer(event.getPlayer()) instanceof DInstancePlayer)) {
             return;
         }
+        DInstancePlayer dPlayer = (DInstancePlayer) dPlayers.getByPlayer(event.getPlayer());
 
         String command = event.getMessage().toLowerCase();
         ArrayList<String> commandWhitelist = new ArrayList<>();
 
-        GameWorld gameWorld = GameWorld.getByWorld(dPlayer.getWorld());
+        Game game = Game.getByWorld(dPlayer.getWorld());
 
-        if (dPlayer.isEditing()) {
+        if (dPlayer instanceof DEditPlayer) {
             if (DPermissions.hasPermission(event.getPlayer(), DPermissions.CMD_EDIT)) {
                 return;
 
@@ -604,9 +628,9 @@ public class PlayerListener implements Listener {
                 commandWhitelist.addAll(plugin.getMainConfig().getEditCommandWhitelist());
             }
 
-        } else if (gameWorld != null) {
-            if (gameWorld.getConfig() != null) {
-                commandWhitelist.addAll(gameWorld.getConfig().getGameCommandWhitelist());
+        } else if (game != null) {
+            if (game.getRules() != null) {
+                commandWhitelist.addAll(game.getRules().getGameCommandWhitelist());
             }
         }
 

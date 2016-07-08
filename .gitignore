@@ -1,6 +1,7 @@
 /nb-configuration.xml
 /target
 /dependency-reduced-pom.xml
+licenseheader.txt
 *.iml
 /.idea
 */target

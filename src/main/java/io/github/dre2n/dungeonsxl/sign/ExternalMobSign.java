@@ -52,8 +52,8 @@ public class ExternalMobSign extends DSign implements MobSign {
     private LivingEntity externalMob;
     private List<Entity> externalMobs = new ArrayList<>();
 
-    public ExternalMobSign(Sign sign, GameWorld gameWorld) {
-        super(sign, gameWorld);
+    public ExternalMobSign(Sign sign, String[] lines, GameWorld gameWorld) {
+        super(sign, lines, gameWorld);
     }
 
     @Override
@@ -196,7 +196,6 @@ public class ExternalMobSign extends DSign implements MobSign {
 
     @Override
     public boolean check() {
-        String lines[] = getSign().getLines();
         if (lines[1].isEmpty() || lines[2].isEmpty()) {
             return false;
         }
@@ -216,8 +215,6 @@ public class ExternalMobSign extends DSign implements MobSign {
 
     @Override
     public void onInit() {
-        String lines[] = getSign().getLines();
-
         String mob = lines[1];
         if (mob != null) {
             String[] attributes = lines[2].split(",");
@@ -277,7 +274,7 @@ public class ExternalMobSign extends DSign implements MobSign {
         for (Entity entity : spawnLocation.getChunk().getEntities()) {
             if (entity.getLocation().getX() >= spawnLocation.getX() - 1 && entity.getLocation().getX() <= spawnLocation.getX() + 1 && entity.getLocation().getY() >= spawnLocation.getY() - 1
                     && entity.getLocation().getY() <= spawnLocation.getY() + 1 && entity.getLocation().getZ() >= spawnLocation.getZ() - 1 && entity.getLocation().getZ() <= spawnLocation.getZ() + 1
-                    && !externalMobs.contains(entity) && !(entity instanceof Player)) {
+                    && !externalMobs.contains(entity) && entity instanceof LivingEntity && !(entity instanceof Player)) {
                 setExternalMob((LivingEntity) entity);
                 externalMobs.add(entity);
                 return;
